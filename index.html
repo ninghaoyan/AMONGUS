@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Impostor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --void:#06080f;
+    --space:#0d1220;
+    --panel:#111827;
+    --accent:#7c3aed;
+    --accent2:#06b6d4;
+    --danger:#ef4444;
+    --success:#10b981;
+    --warn:#f59e0b;
+    --text:#e2e8f0;
+    --muted:#64748b;
+  }
+  body{background:var(--void);color:var(--text);font-family:'Share Tech Mono',monospace;overflow-x:hidden;min-height:100vh}
+  h1,h2,h3,.title{font-family:'Orbitron',sans-serif}
+
+  #screen-start,#screen-game,#screen-end{display:none;width:100%;min-height:100vh}
+  #screen-start.active,#screen-game.active,#screen-end.active{display:flex}
+
+  /* ── START SCREEN ── */
+  #screen-start{flex-direction:column;align-items:center;justify-content:center;gap:2rem;padding:2rem;background:radial-gradient(ellipse at 50% 40%,#1a0a3a 0%,var(--void) 70%)}
+  .star-field{position:fixed;inset:0;pointer-events:none;z-index:0}
+  .star{position:absolute;border-radius:50%;background:#fff;animation:twinkle var(--d,2s) ease-in-out infinite alternate}
+  @keyframes twinkle{from{opacity:0.1}to{opacity:0.9}}
+  .start-box{position:relative;z-index:1;text-align:center;max-width:480px;width:100%}
+  .game-title{font-size:clamp(2rem,6vw,3.5rem);font-weight:900;letter-spacing:0.05em;color:#fff;text-shadow:0 0 30px var(--accent),0 0 60px var(--accent)}
+  .game-subtitle{font-size:0.85rem;color:var(--accent2);letter-spacing:0.3em;text-transform:uppercase;margin-top:0.5rem}
+  .crew-preview{display:flex;justify-content:center;gap:12px;margin:2rem 0;flex-wrap:wrap}
+  .crewmate-icon{width:36px;height:44px;border-radius:50% 50% 40% 40%;position:relative;animation:float var(--fd,3s) ease-in-out infinite alternate}
+  @keyframes float{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+  .crewmate-icon::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:22px;height:8px;border-radius:50%;background:rgba(0,0,0,0.4)}
+  .btn-primary{display:inline-block;padding:0.9rem 2.5rem;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s;text-transform:uppercase;margin-top:1rem}
+  .btn-primary:hover{background:#6d28d9;transform:scale(1.04)}
+  .btn-primary:active{transform:scale(0.97)}
+  .controls-hint{margin-top:1.5rem;font-size:0.75rem;color:var(--muted);line-height:2}
+  .controls-hint span{color:var(--accent2)}
+
+  /* ── GAME SCREEN ── */
+  #screen-game{flex-direction:column;align-items:center;padding:0.75rem;gap:8px;background:var(--void)}
+  #hud{display:flex;gap:6px;flex-wrap:wrap;align-items:center;width:100%;max-width:760px}
+  .hud-badge{font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:var(--text);font-family:'Share Tech Mono',monospace}
+  .hud-badge.you{background:rgba(124,58,237,0.2);border-color:var(--accent);color:#c4b5fd}
+  .hud-badge.crew{background:rgba(16,185,129,0.15);border-color:var(--success);color:#6ee7b7}
+  .hud-badge.impostor{background:rgba(239,68,68,0.15);border-color:var(--danger);color:#fca5a5}
+  .hud-btn{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid;cursor:pointer;font-family:'Share Tech Mono',monospace;transition:all 0.15s}
+  .hud-btn.warn{border-color:var(--warn);color:var(--warn);background:rgba(245,158,11,0.1)}
+  .hud-btn.warn:hover{background:rgba(245,158,11,0.25)}
+  .hud-btn.danger{border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,0.1)}
+  .hud-btn.danger:hover{background:rgba(239,68,68,0.25)}
+  .hud-btn.kill{border-color:var(--danger);color:#fff;background:var(--danger)}
+  .hud-btn.kill:hover{background:#dc2626}
+  .hud-btn:disabled{opacity:0.35;cursor:default}
+  canvas{border-radius:12px;border:1.5px solid rgba(124,58,237,0.4);display:block;max-width:100%}
+  #dpad-area{display:flex;gap:12px;align-items:center;margin-top:4px;flex-wrap:wrap;width:100%;max-width:760px}
+  #dpad{display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);gap:3px}
+  .dk{width:40px;height:40px;border-radius:8px;border:1px solid rgba(124,58,237,0.5);background:rgba(124,58,237,0.12);color:#c4b5fd;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;transition:background 0.1s}
+  .dk:active,.dk.on{background:rgba(124,58,237,0.45)}
+  .dk.blank{background:transparent;border-color:transparent;pointer-events:none}
+  #action-btns{display:flex;flex-direction:column;gap:5px}
+  .act-btn{padding:6px 14px;border-radius:8px;border:1px solid;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:12px;transition:all 0.15s;display:none}
+  .act-btn.show{display:block}
+  .act-btn.emergency{border-color:var(--warn);color:var(--warn);background:rgba(245,158,11,0.1)}
+  .act-btn.emergency:hover{background:rgba(245,158,11,0.25)}
+  .act-btn.report{border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,0.1)}
+  .act-btn.report:hover{background:rgba(239,68,68,0.25)}
+  .act-btn.kill-act{border-color:var(--danger);color:#fff;background:var(--danger)}
+  .act-btn.kill-act:hover{background:#dc2626}
+  .act-btn:disabled{opacity:0.35;cursor:default}
+  #log{width:100%;max-width:760px;max-height:70px;overflow-y:auto;font-size:11px;color:var(--muted);line-height:1.7;padding:5px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.3)}
+
+  /* ── MEETING OVERLAY ── */
+  #meeting-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;padding:1rem}
+  #meeting-overlay.open{display:flex}
+  .meeting-box{background:var(--panel);border:1px solid rgba(124,58,237,0.5);border-radius:16px;padding:1.5rem;width:100%;max-width:440px;animation:popIn 0.25s ease}
+  @keyframes popIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}
+  .meeting-title{font-family:'Orbitron',sans-serif;font-size:1.1rem;color:#c4b5fd;margin-bottom:0.5rem}
+  .meeting-reason{font-size:12px;color:var(--muted);margin-bottom:1rem;line-height:1.6}
+  .meeting-discussion{font-size:12px;color:var(--accent2);margin-bottom:1rem;padding:8px 12px;border-left:3px solid var(--accent2);background:rgba(6,182,212,0.07);border-radius:0 6px 6px 0;line-height:1.6}
+  .vote-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:1rem}
+  .vote-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);cursor:pointer;transition:all 0.15s}
+  .vote-row:hover{border-color:rgba(124,58,237,0.5);background:rgba(124,58,237,0.1)}
+  .vote-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .vote-name{font-size:13px;flex:1}
+  .vote-tally{font-size:11px;color:var(--muted)}
+  .skip-link{font-size:11px;color:var(--muted);text-decoration:underline;cursor:pointer;background:none;border:none;margin-top:4px;display:block;text-align:center}
+
+  /* ── END SCREEN ── */
+  #screen-end{flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:2rem;background:radial-gradient(ellipse at 50% 40%,#1a0a3a 0%,var(--void) 70%)}
+  .end-box{text-align:center;max-width:420px;z-index:1}
+  .end-title{font-size:2.2rem;font-weight:900;margin-bottom:0.5rem}
+  .end-sub{font-size:0.9rem;color:var(--muted);margin-bottom:1.5rem;line-height:1.7}
+  .end-crew{color:var(--success)}
+  .end-imp{color:var(--danger)}
+</style>
+</head>
+<body>
+
+<!-- STAR FIELD -->
+<div class="star-field" id="stars"></div>
+
+<!-- START SCREEN -->
+<div id="screen-start" class="active">
+  <div class="start-box">
+    <div class="game-title">SPACE IMPOSTOR</div>
+    <div class="game-subtitle">Find the traitor among the crew</div>
+    <div class="crew-preview" id="crew-preview"></div>
+    <button class="btn-primary" onclick="startGame()">LAUNCH MISSION</button>
+    <div class="controls-hint">
+      <span>WASD</span> / <span>Arrow Keys</span> — move<br>
+      <span>E</span> — emergency meeting (in Cafeteria)<br>
+      <span>R</span> — report body &nbsp; <span>K</span> — kill (impostor only)
+    </div>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="screen-game">
+  <div id="hud"></div>
+  <canvas id="c"></canvas>
+  <div id="dpad-area">
+    <div id="dpad">
+      <div class="dk blank"></div>
+      <button class="dk" id="dk-up"   onpointerdown="kset('up',true)"   onpointerup="kset('up',false)"   onpointerleave="kset('up',false)">▲</button>
+      <div class="dk blank"></div>
+      <button class="dk" id="dk-left" onpointerdown="kset('left',true)" onpointerup="kset('left',false)" onpointerleave="kset('left',false)">◀</button>
+      <button class="dk" id="dk-down" onpointerdown="kset('down',true)" onpointerup="kset('down',false)" onpointerleave="kset('down',false)">▼</button>
+      <button class="dk" id="dk-right"onpointerdown="kset('right',true)"onpointerup="kset('right',false)"onpointerleave="kset('right',false)">▶</button>
+    </div>
+    <div id="action-btns">
+      <button class="act-btn emergency" id="act-emergency" onclick="callEmergency()">🔴 Emergency [E]</button>
+      <button class="act-btn report"    id="act-report"    onclick="reportBody()">💀 Report Body [R]</button>
+      <button class="act-btn kill-act"  id="act-kill"      onclick="playerKill()">🔪 Kill [K]</button>
+    </div>
+    <button class="act-btn show emergency" style="height:fit-content;margin-top:0" onclick="goToStart()">✕ Quit</button>
+  </div>
+  <div id="log"></div>
+</div>
+
+<!-- MEETING OVERLAY -->
+<div id="meeting-overlay">
+  <div class="meeting-box" id="meeting-box"></div>
+</div>
+
+<!-- END SCREEN -->
+<div id="screen-end">
+  <div class="end-box" id="end-box"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  MAP DATA
+// ══════════════════════════════════════════
+const ROOM_DEFS=[
+  {id:'cafeteria',    name:'Cafeteria',   x:255,y:22, w:185,h:105,fill:'#0f1f35',stroke:'#4fc3f7',glow:'#4fc3f7',isEmergency:true},
+  {id:'weapons',      name:'Weapons',     x:460,y:12, w:125,h:80, fill:'#2a1010',stroke:'#ff6b6b',glow:'#ff6b6b'},
+  {id:'navigation',   name:'Navigation',  x:545,y:118,w:145,h:78, fill:'#0f2a15',stroke:'#69f0ae',glow:'#69f0ae'},
+  {id:'shields',      name:'Shields',     x:540,y:228,w:150,h:78, fill:'#1a0f2e',stroke:'#ce93d8',glow:'#ce93d8'},
+  {id:'communications',name:'Comms',      x:390,y:330,w:150,h:88, fill:'#0a1525',stroke:'#4dd0e1',glow:'#4dd0e1'},
+  {id:'storage',      name:'Storage',     x:195,y:325,w:160,h:93, fill:'#0f2a1a',stroke:'#a5d6a7',glow:'#a5d6a7'},
+  {id:'reactor',      name:'Reactor',     x:8,  y:225,w:128,h:82, fill:'#2a1a08',stroke:'#ffb74d',glow:'#ffb74d'},
+  {id:'upper_engine', name:'Upper Eng.',  x:8,  y:75, w:128,h:105,fill:'#2a200a',stroke:'#ffe082',glow:'#ffe082'},
+  {id:'lower_engine', name:'Lower Eng.',  x:8,  y:325,w:128,h:88, fill:'#2a200a',stroke:'#ffe082',glow:'#ffe082'},
+  {id:'security',     name:'Security',    x:165,y:160,w:130,h:78, fill:'#0f0f2a',stroke:'#90caf9',glow:'#90caf9'},
+  {id:'medbay',       name:'Medbay',      x:162,y:265,w:118,h:78, fill:'#0a2520',stroke:'#80cbc4',glow:'#80cbc4'},
+  {id:'electrical',   name:'Electrical',  x:335,y:160,w:130,h:78, fill:'#252510',stroke:'#fff176',glow:'#fff176'},
+];
+
+const HALL_DEFS=[
+  {x:255,y:57,  w:205,h:26,color:'#0d1825'},
+  {x:447,y:35,  w:26, h:50,color:'#1a0d1a'},
+  {x:571,y:83,  w:26, h:48,color:'#0d1a10'},
+  {x:571,y:196, w:26, h:45,color:'#14091e'},
+  {x:571,y:298, w:26, h:42,color:'#091418'},
+  {x:430,y:360, w:26, h:58,color:'#091418'},
+  {x:340,y:360, w:66, h:26,color:'#0d1a10'},
+  {x:174,y:360, w:33, h:26,color:'#0d1a10'},
+  {x:148,y:185, w:30, h:26,color:'#0d0d1a'},
+  {x:148,y:130, w:26, h:68,color:'#0d0d1a'},
+  {x:148,y:298, w:26, h:40,color:'#0d0d1a'},
+  {x:72, y:173, w:26, h:64,color:'#1a1208'},
+  {x:72, y:305, w:26, h:32,color:'#1a1208'},
+  {x:300,y:140, w:26, h:32,color:'#0d0d1a'},
+  {x:300,y:230, w:26, h:42,color:'#0d0d1a'},
+  {x:480,y:185, w:26, h:56,color:'#14091e'},
+  {x:218,y:243, w:26, h:36,color:'#0d1a10'},
+];
+
+const ADJ={
+  cafeteria:['weapons','upper_engine','security'],
+  weapons:['cafeteria','navigation'],
+  navigation:['weapons','shields'],
+  shields:['navigation','communications'],
+  communications:['shields','storage'],
+  storage:['communications','medbay','electrical'],
+  reactor:['upper_engine','lower_engine'],
+  upper_engine:['cafeteria','reactor','security'],
+  lower_engine:['reactor','medbay'],
+  security:['cafeteria','upper_engine','electrical'],
+  medbay:['storage','lower_engine'],
+  electrical:['security','storage'],
+};
+
+const PLAYER_COLORS=['#a78bfa','#f87171','#34d399','#f472b6','#fbbf24','#60a5fa','#fb923c'];
+const BOT_NAMES=['Bot-B','Bot-C','Bot-D','Bot-E','Bot-F','Bot-G'];
+
+// ══════════════════════════════════════════
+//  CANVAS SETUP
+// ══════════════════════════════════════════
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const CW=700,CH=440;
+canvas.width=CW;canvas.height=CH;
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let players=[],dead=[],logs=[],phase='playing';
+let pendingBody=null,animId=null,killCooldown=0,tick=0;
+let meetingVotes={};
+const keys={up:false,down:false,left:false,right:false};
+const SPEED=2.5;
+
+// Bot AI state
+const suspicion={};// name -> suspicion score
+
+function kset(k,v){keys[k]=v;}
+function me(){return players.find(p=>p.isPlayer)}
+function alive(){return players.filter(p=>p.alive)}
+function aliveCrew(){return players.filter(p=>p.alive&&p.role==='crewmate')}
+function aliveImp(){return players.find(p=>p.alive&&p.role==='impostor')}
+
+function rc(id){return ROOM_DEFS.find(r=>r.id===id)}
+function rcenter(r){return{x:r.x+r.w/2,y:r.y+r.h/2}}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function lerp(a,b,t){return a+(b-a)*t}
+function hexToRgb(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r,g,b}}
+
+// ══════════════════════════════════════════
+//  WALKABILITY
+// ══════════════════════════════════════════
+function isWalkable(px,py){
+  for(const r of ROOM_DEFS)
+    if(px>=r.x+2&&px<=r.x+r.w-2&&py>=r.y+2&&py<=r.y+r.h-2)return true;
+  for(const h of HALL_DEFS)
+    if(px>=h.x+1&&px<=h.x+h.w-1&&py>=h.y+1&&py<=h.y+h.h-1)return true;
+  return false;
+}
+function getRoomAt(px,py){
+  for(const r of ROOM_DEFS)
+    if(px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h)return r.id;
+  return null;
+}
+function getZoneAt(px,py){
+  const r=getRoomAt(px,py);if(r)return r;
+  for(const h of HALL_DEFS)
+    if(px>=h.x&&px<=h.x+h.w&&py>=h.y&&py<=h.y+h.h)return'hallway';
+  return null;
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+function startGame(){
+  showScreen('game');
+  players=[];dead=[];logs=[];phase='playing';pendingBody=null;killCooldown=0;tick=0;
+  keys.up=keys.down=keys.left=keys.right=false;
+  Object.keys(suspicion).forEach(k=>delete suspicion[k]);
+
+  const spawn=rc('cafeteria'),sc=rcenter(spawn);
+  const allNames=['You',...BOT_NAMES];
+  const impIdx=1+Math.floor(Math.random()*BOT_NAMES.length);
+
+  allNames.forEach((n,i)=>{
+    suspicion[n]=0;
+    players.push({
+      name:n,
+      role:i===impIdx?'impostor':'crewmate',
+      x:sc.x+(i-3)*18,y:sc.y,
+      tx:sc.x+(i-3)*18,ty:sc.y,
+      room:'cafeteria',
+      color:PLAYER_COLORS[i],
+      alive:true,
+      isPlayer:n==='You',
+      cooldown:0,
+      wanderTarget:null,
+    });
+  });
+
+  cancelAnimationFrame(animId);
+  loop();
+  addLog('Mission start. You are: '+me().role.toUpperCase()+(me().role==='impostor'?' — eliminate the crew undetected!':' — survive and find the impostor!'));
+}
+
+function goToStart(){cancelAnimationFrame(animId);showScreen('start');}
+
+function showScreen(s){
+  document.querySelectorAll('#screen-start,#screen-game,#screen-end').forEach(el=>el.classList.remove('active'));
+  document.getElementById('screen-'+s).classList.add('active');
+}
+
+// ══════════════════════════════════════════
+//  LOG
+// ══════════════════════════════════════════
+function addLog(msg){
+  logs.unshift(msg);if(logs.length>80)logs.pop();
+  const el=document.getElementById('log');
+  if(el)el.innerHTML=logs.map(l=>`<div>${l}</div>`).join('');
+}
+
+// ══════════════════════════════════════════
+//  MOVEMENT — PLAYER
+// ══════════════════════════════════════════
+function updatePlayerMovement(){
+  const p=me();
+  if(!p||!p.alive||phase!=='playing')return;
+  let dx=0,dy=0;
+  if(keys.left)dx=-1;if(keys.right)dx+=1;
+  if(keys.up)dy=-1;if(keys.down)dy+=1;
+  if(!dx&&!dy)return;
+  const len=Math.hypot(dx,dy)||1;
+  const mx=dx/len*SPEED,my=dy/len*SPEED;
+  const nx=p.x+mx,ny=p.y+my;
+  if(isWalkable(nx,ny)){p.x=nx;p.y=ny;}
+  else if(isWalkable(nx,p.y)){p.x=nx;}
+  else if(isWalkable(p.x,ny)){p.y=ny;}
+  p.tx=p.x;p.ty=p.y;
+  const room=getRoomAt(p.x,p.y);
+  if(room&&room!==p.room){p.room=room;addLog('> Entered '+rc(room).name);}
+  else if(!room)p.room=getZoneAt(p.x,p.y)||p.room;
+}
+
+// ══════════════════════════════════════════
+//  MOVEMENT — BOTS (smooth free-roam)
+// ══════════════════════════════════════════
+function pickBotTarget(p){
+  // Pick a random walkable point inside a random adjacent room
+  const nb=[p.room,...(ADJ[p.room]||[])].filter(Boolean);
+  const destRoom=rc(nb[Math.floor(Math.random()*nb.length)]);
+  if(!destRoom)return{x:p.x,y:p.y};
+  return{
+    x:destRoom.x+8+Math.random()*(destRoom.w-16),
+    y:destRoom.y+8+Math.random()*(destRoom.h-16)
+  };
+}
+
+function moveBotsSmooth(){
+  players.forEach(p=>{
+    if(!p.alive||p.isPlayer)return;
+    if(p.cooldown>0){p.cooldown--;return;}
+
+    if(!p.wanderTarget||dist(p,p.wanderTarget)<6){
+      p.wanderTarget=pickBotTarget(p);
+      p.cooldown=Math.floor(30+Math.random()*60);
+    }
+
+    const t=p.wanderTarget;
+    const dx=t.x-p.x,dy=t.y-p.y;
+    const d=Math.hypot(dx,dy)||1;
+    const spd=1.4;
+    const nx=p.x+dx/d*spd,ny=p.y+dy/d*spd;
+    if(isWalkable(nx,ny)){p.x=nx;p.y=ny;}
+    else if(isWalkable(nx,p.y)){p.x=nx;}
+    else if(isWalkable(p.x,ny)){p.y=ny;}
+    else{p.wanderTarget=null;}
+
+    p.tx=p.x;p.ty=p.y;
+    const room=getRoomAt(p.x,p.y);
+    if(room)p.room=room;
+
+    // Impostor tries to hunt isolated crewmates
+    if(p.role==='impostor'&&p.cooldown===0){
+      const targets=aliveCrew().filter(c=>c.room===p.room&&!c.isPlayer&&dist(p,c)<70);
+      if(targets.length&&Math.random()<0.025){
+        const v=targets[0];
+        killBot(v,p);
+      }
+    }
+  });
+  if(killCooldown>0)killCooldown--;
+}
+
+function killBot(victim,killer){
+  victim.alive=false;
+  dead.push({name:victim.name,x:victim.x,y:victim.y,color:victim.color,room:victim.room});
+  addLog('! '+victim.name+' was eliminated in '+(rc(victim.room)?.name||'the halls')+'!');
+  killer.cooldown=120;
+  suspicion[killer.name]=(suspicion[killer.name]||0)+15;
+  pendingBody={name:victim.name,room:victim.room,killer:killer.name};
+  checkWin();
+}
+
+// ══════════════════════════════════════════
+//  PLAYER ACTIONS
+// ══════════════════════════════════════════
+function playerKill(){
+  const p=me();
+  if(!p||p.role!=='impostor'||killCooldown>0||phase!=='playing')return;
+  const targets=aliveCrew().filter(c=>c.room===p.room&&dist(c,p)<80);
+  if(!targets.length){addLog('! No one close enough to eliminate.');return;}
+  const v=targets.sort((a,b)=>dist(p,a)-dist(p,b))[0];
+  v.alive=false;
+  dead.push({name:v.name,x:v.x,y:v.y,color:v.color,room:v.room});
+  addLog('You eliminated '+v.name+'.');
+  killCooldown=90;
+  pendingBody={name:v.name,room:v.room,killer:'You'};
+  checkWin();updateHud();
+}
+
+function reportBody(){
+  if(!pendingBody||phase!=='playing')return;
+  const b=pendingBody;pendingBody=null;
+  suspicion[b.killer]=(suspicion[b.killer]||0)+30;
+  addLog('Body reported! Emergency meeting called.');
+  triggerMeeting(b.name+"'s body was found in "+(rc(b.room)?.name||'the halls')+'!');
+}
+
+function callEmergency(){
+  if(phase!=='playing')return;
+  const p=me();
+  if(!p||!p.alive||p.room!=='cafeteria'){addLog('! Emergency button is only in Cafeteria.');return;}
+  addLog('Emergency meeting called!');
+  triggerMeeting('Emergency meeting called!');
+}
+
+// ══════════════════════════════════════════
+//  SMART BOT VOTING (local, no API)
+// ══════════════════════════════════════════
+function computeBotVotes(){
+  const alv=alive();
+  const bots=alv.filter(p=>!p.isPlayer);
+  const votes={};
+
+  bots.forEach(bot=>{
+    // Each bot has its own suspicion view with some noise
+    const scores={};
+    alv.forEach(p=>{
+      if(p.name===bot.name)return;
+      let s=suspicion[p.name]||0;
+      s+=Math.random()*20-10; // noise ±10
+      if(bot.role==='impostor'){
+        // Impostor deflects — boost suspicion on random crewmates
+        if(p.role==='crewmate')s-=15;
+        // pick someone with moderate suspicion to frame
+        const targets=alv.filter(x=>x.role==='crewmate'&&x.name!==bot.name);
+        if(targets.length){
+          const frame=targets[Math.floor(Math.random()*targets.length)];
+          if(p.name===frame.name)s+=35;
+        }
+      }
+      scores[p.name]=s;
+    });
+    // vote for highest suspicion
+    const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+    votes[bot.name]=sorted[0][0];
+  });
+  return votes;
+}
+
+function generateDiscussion(){
+  const imp=aliveImp();
+  const lines=[];
+  const alv=alive();
+  const suspects=Object.entries(suspicion).filter(([n])=>alv.find(p=>p.name===n)).sort((a,b)=>b[1]-a[1]);
+  const topSuspect=suspects[0]?suspects[0][0]:null;
+
+  if(topSuspect&&topSuspect!==imp?.name){
+    lines.push(`Bot-B: I saw ${topSuspect} near the body. Very suspicious.`);
+    lines.push(`Bot-C: Agreed. ${topSuspect} hasn't been doing tasks either.`);
+  } else if(imp){
+    lines.push(`Bot-D: I don't know who it is yet. We need more info.`);
+    lines.push(`${imp.name}: It wasn't me! Check the others.`);
+  } else {
+    lines.push('Bot-B: Everyone seems suspicious. Hard to say.');
+    lines.push('Bot-C: Let\'s not make a mistake this round.');
+  }
+  return lines.join('\n');
+}
+
+// ══════════════════════════════════════════
+//  MEETING
+// ══════════════════════════════════════════
+function triggerMeeting(reason){
+  phase='meeting';
+  meetingVotes=computeBotVotes();
+  const disc=generateDiscussion();
+  const alv=alive();
+  const tally={};
+  Object.values(meetingVotes).forEach(v=>{tally[v]=(tally[v]||0)+1;});
+  const vlines=Object.entries(meetingVotes).map(([b,t])=>`${b}→${t}`).join('  ');
+
+  document.getElementById('meeting-box').innerHTML=`
+    <div class="meeting-title">⚠ Emergency Meeting</div>
+    <div class="meeting-reason">${reason}</div>
+    <div class="meeting-discussion">${disc.replace(/\n/g,'<br>')}</div>
+    <div style="font-size:10px;color:#475569;margin-bottom:8px">AI votes: ${vlines}</div>
+    <div class="vote-grid">
+      ${alv.map(p=>`
+        <div class="vote-row" onclick="castVote('${p.name}')">
+          <div class="vote-dot" style="background:${p.color}"></div>
+          <div class="vote-name">${p.name}${p.isPlayer?' (you)':''}</div>
+          <div class="vote-tally">${tally[p.name]?tally[p.name]+' vote(s)':''}</div>
+        </div>`).join('')}
+    </div>
+    <button class="skip-link" onclick="castVote(null)">Skip vote</button>
+  `;
+  document.getElementById('meeting-overlay').classList.add('open');
+}
+
+function castVote(myVote){
+  document.getElementById('meeting-overlay').classList.remove('open');
+  phase='playing';
+  const alv=alive();
+  const tally={};
+  if(myVote)tally[myVote]=(tally[myVote]||0)+1;
+  Object.values(meetingVotes).forEach(v=>{if(alv.find(p=>p.name===v))tally[v]=(tally[v]||0)+1;});
+  let maxV=0,ejected=null;
+  Object.entries(tally).forEach(([n,c])=>{if(c>maxV){maxV=c;ejected=n;}});
+  if(!ejected||maxV<2){addLog('No clear majority — nobody ejected.');updateHud();return;}
+  const t=players.find(p=>p.name===ejected);
+  if(t){
+    t.alive=false;
+    if(t.role==='impostor'){addLog(ejected+' was ejected... they were the IMPOSTOR! Crew wins!');endGame('crew');}
+    else{addLog(ejected+' was ejected... they were innocent ('+t.role+').');checkWin();}
+  }
+  updateHud();
+}
+
+// ══════════════════════════════════════════
+//  WIN / END
+// ══════════════════════════════════════════
+function checkWin(){
+  if(!aliveImp()){endGame('crew');return;}
+  if(aliveCrew().length===0){endGame('impostor');return;}
+  const p=me();
+  if(p&&!p.alive)endGame('dead');
+}
+
+function endGame(result){
+  phase='end';cancelAnimationFrame(animId);
+  const imp=players.find(p=>p.role==='impostor');
+  const box=document.getElementById('end-box');
+  if(result==='crew'){
+    box.innerHTML=`<div class="end-title end-crew">🎉 CREW WINS!</div>
+      <div class="end-sub">The impostor <strong>${imp?.name}</strong> was found and ejected into space.<br>The ship is safe.</div>
+      <button class="btn-primary" onclick="startGame()">PLAY AGAIN</button>&nbsp;
+      <button class="btn-primary" style="background:#1e293b;margin-top:8px" onclick="goToStart()">MENU</button>`;
+  } else if(result==='impostor'){
+    box.innerHTML=`<div class="end-title end-imp">💀 IMPOSTOR WINS!</div>
+      <div class="end-sub"><strong>${imp?.name}</strong> eliminated the entire crew.<br>Nobody was left to tell the tale.</div>
+      <button class="btn-primary" onclick="startGame()">PLAY AGAIN</button>&nbsp;
+      <button class="btn-primary" style="background:#1e293b;margin-top:8px" onclick="goToStart()">MENU</button>`;
+  } else {
+    box.innerHTML=`<div class="end-title end-imp">☠ YOU WERE ELIMINATED</div>
+      <div class="end-sub">The impostor was <strong>${imp?.name}</strong>.<br>Better luck next mission.</div>
+      <button class="btn-primary" onclick="startGame()">TRY AGAIN</button>&nbsp;
+      <button class="btn-primary" style="background:#1e293b;margin-top:8px" onclick="goToStart()">MENU</button>`;
+  }
+  showScreen('end');
+}
+
+// ══════════════════════════════════════════
+//  DRAW
+// ══════════════════════════════════════════
+function drawMap(){
+  ctx.fillStyle='#06080f';ctx.fillRect(0,0,CW,CH);
+
+  HALL_DEFS.forEach(h=>{
+    ctx.fillStyle=h.color;ctx.fillRect(h.x,h.y,h.w,h.h);
+    ctx.strokeStyle='rgba(100,150,255,0.2)';ctx.lineWidth=1.5;ctx.strokeRect(h.x,h.y,h.w,h.h);
+    // center line
+    ctx.strokeStyle='rgba(150,200,255,0.07)';ctx.lineWidth=1;
+    if(h.w>h.h){ctx.beginPath();ctx.moveTo(h.x,h.y+h.h/2);ctx.lineTo(h.x+h.w,h.y+h.h/2);ctx.stroke();}
+    else{ctx.beginPath();ctx.moveTo(h.x+h.w/2,h.y);ctx.lineTo(h.x+h.w/2,h.y+h.h);ctx.stroke();}
+  });
+
+  ROOM_DEFS.forEach(r=>{
+    const pulse=0.7+0.3*Math.sin(tick*0.025+r.x*0.01);
+    const rgb=hexToRgb(r.glow);
+
+    ctx.fillStyle=r.fill;
+    ctx.beginPath();ctx.roundRect(r.x,r.y,r.w,r.h,5);ctx.fill();
+
+    // outer glow
+    ctx.strokeStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},${0.12*pulse})`;
+    ctx.lineWidth=8;ctx.stroke();
+    // border
+    ctx.strokeStyle=r.stroke;ctx.lineWidth=1.8;ctx.stroke();
+
+    // grid
+    ctx.strokeStyle='rgba(255,255,255,0.025)';ctx.lineWidth=1;
+    for(let gx=r.x+14;gx<r.x+r.w;gx+=14){ctx.beginPath();ctx.moveTo(gx,r.y+2);ctx.lineTo(gx,r.y+r.h-2);ctx.stroke();}
+    for(let gy=r.y+14;gy<r.y+r.h;gy+=14){ctx.beginPath();ctx.moveTo(r.x+2,gy);ctx.lineTo(r.x+r.w-2,gy);ctx.stroke();}
+
+    // label
+    ctx.fillStyle=r.stroke;ctx.font='bold 9px "Share Tech Mono",monospace';ctx.textAlign='center';
+    ctx.fillText(r.name,r.x+r.w/2,r.y+13);
+
+    // emergency button
+    if(r.isEmergency){
+      const bx=r.x+r.w/2,by=r.y+r.h-16;
+      const ep=0.55+0.45*Math.sin(tick*0.08);
+      ctx.fillStyle=`rgba(239,68,68,${ep})`;
+      ctx.beginPath();ctx.arc(bx,by,7,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#ff8888';ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillText('!',bx,by+3);
+    }
+  });
+}
+
+function drawEntities(){
+  const p=me();
+  if(p&&p.alive){
+    const r=rc(p.room);
+    if(r){
+      const rgb=hexToRgb(r.glow);
+      ctx.strokeStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},0.45)`;
+      ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(r.x+2,r.y+2,r.w-4,r.h-4,4);ctx.stroke();
+    }
+  }
+
+  // dead bodies
+  dead.forEach(d=>{
+    const pulse=0.5+0.5*Math.sin(tick*0.06);
+    ctx.fillStyle=`rgba(239,68,68,${0.3+0.25*pulse})`;
+    ctx.beginPath();ctx.arc(d.x,d.y,9,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#ef4444';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText('✕',d.x,d.y+3);
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='8px sans-serif';ctx.fillText(d.name,d.x,d.y-13);
+  });
+
+  // players
+  alive().forEach(pl=>{
+    const rgb=hexToRgb(pl.color);
+    // glow ring for player
+    if(pl.isPlayer){
+      const gp=0.5+0.5*Math.sin(tick*0.05);
+      ctx.beginPath();ctx.arc(pl.x,pl.y,18,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},${0.1+0.07*gp})`;ctx.fill();
+    }
+    // body
+    ctx.beginPath();ctx.arc(pl.x,pl.y,pl.isPlayer?11:8,0,Math.PI*2);
+    ctx.fillStyle=pl.color;ctx.fill();
+    ctx.strokeStyle=pl.isPlayer?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.45)';
+    ctx.lineWidth=pl.isPlayer?2:1.5;ctx.stroke();
+    // visor
+    ctx.fillStyle='rgba(100,200,255,0.7)';
+    ctx.beginPath();
+    const vx=pl.x+(pl.isPlayer?3:2),vy=pl.y-(pl.isPlayer?4:3);
+    ctx.ellipse(vx,vy,pl.isPlayer?4:3,pl.isPlayer?3:2,0,0,Math.PI*2);ctx.fill();
+    // name
+    ctx.fillStyle='rgba(255,255,255,0.88)';
+    ctx.font=(pl.isPlayer?'bold ':'')+'8px "Share Tech Mono",monospace';
+    ctx.textAlign='center';ctx.fillText(pl.name,pl.x,pl.y-(pl.isPlayer?24:19));
+  });
+}
+
+// ══════════════════════════════════════════
+//  HUD
+// ══════════════════════════════════════════
+function updateHud(){
+  const p=me();
+  const hasPending=pendingBody&&phase==='playing'&&p?.alive;
+  const inCafe=p?.alive&&p?.room==='cafeteria'&&phase==='playing';
+  const inRange=p&&aliveCrew().filter(c=>c.room===p.room&&dist(c,p)<80).length>0;
+  const canKill=p?.role==='impostor'&&p?.alive&&killCooldown===0&&phase==='playing'&&inRange;
+  const kcd=killCooldown>0?' ('+Math.ceil(killCooldown/60)+'s)':'';
+
+  document.getElementById('hud').innerHTML=`
+    <span class="hud-badge you">YOU: ${p?.role?.toUpperCase()||'?'}</span>
+    <span class="hud-badge ${p?.role==='impostor'?'impostor':'crew'}">CREW: ${aliveCrew().length} alive</span>
+    <span class="hud-badge">${p?rc(p.room)?.name||'hallway':'?'}</span>
+  `;
+
+  const ea=document.getElementById('act-emergency');
+  const ra=document.getElementById('act-report');
+  const ka=document.getElementById('act-kill');
+  if(ea){ea.className='act-btn emergency'+(phase==='playing'&&p?.alive?' show':'');ea.textContent=inCafe?'🔴 Emergency [E]':'🔴 Emergency (Cafeteria)';}
+  if(ra){ra.className='act-btn report'+(hasPending?' show':'');}
+  if(ka){
+    ka.className='act-btn kill-act'+(p?.role==='impostor'&&p?.alive&&phase==='playing'?' show':'');
+    ka.disabled=!canKill;
+    ka.textContent='🔪 Kill [K]'+kcd;
+  }
+}
+
+// ══════════════════════════════════════════
+//  LOOP
+// ══════════════════════════════════════════
+function loop(){
+  tick++;
+  if(phase==='playing'){
+    updatePlayerMovement();
+    moveBotsSmooth();
+  }
+  drawMap();
+  drawEntities();
+  updateHud();
+  animId=requestAnimationFrame(loop);
+}
+
+// ══════════════════════════════════════════
+//  KEYBOARD
+// ══════════════════════════════════════════
+window.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft'||e.key==='a'){keys.left=true;e.preventDefault();}
+  if(e.key==='ArrowRight'||e.key==='d'){keys.right=true;e.preventDefault();}
+  if(e.key==='ArrowUp'||e.key==='w'){keys.up=true;e.preventDefault();}
+  if(e.key==='ArrowDown'||e.key==='s'){keys.down=true;e.preventDefault();}
+  if(e.key==='e'||e.key==='E')callEmergency();
+  if(e.key==='r'||e.key==='R')reportBody();
+  if(e.key==='k'||e.key==='K')playerKill();
+});
+window.addEventListener('keyup',e=>{
+  if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;
+  if(e.key==='ArrowRight'||e.key==='d')keys.right=false;
+  if(e.key==='ArrowUp'||e.key==='w')keys.up=false;
+  if(e.key==='ArrowDown'||e.key==='s')keys.down=false;
+});
+
+// ══════════════════════════════════════════
+//  STAR FIELD
+// ══════════════════════════════════════════
+(function(){
+  const sf=document.getElementById('stars');
+  for(let i=0;i<120;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*2+0.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${(Math.random()*3+1).toFixed(1)}s;animation-delay:${(Math.random()*3).toFixed(1)}s;opacity:${Math.random()*0.6+0.1}`;
+    sf.appendChild(s);
+  }
+})();
+
+// ══════════════════════════════════════════
+//  CREW PREVIEW ON START SCREEN
+// ══════════════════════════════════════════
+(function(){
+  const prev=document.getElementById('crew-preview');
+  PLAYER_COLORS.forEach((c,i)=>{
+    const d=document.createElement('div');
+    d.className='crewmate-icon';
+    d.style.cssText=`background:${c};--fd:${(2.5+i*0.4).toFixed(1)}s;animation-delay:${(i*0.2).toFixed(1)}s`;
+    prev.appendChild(d);
+  });
+})();
+</script>
+</body>
+</html>
